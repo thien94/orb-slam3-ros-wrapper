@@ -48,9 +48,10 @@ int main(int argc, char **argv)
     std::string node_name = ros::this_node::getName();
     image_transport::ImageTransport image_transport(node_handler);
 
-    std::string voc_file, settings_file;
+    std::string voc_file, settings_file, traj_save_file;
     node_handler.param<std::string>(node_name + "/voc_file", voc_file, "file_not_set");
     node_handler.param<std::string>(node_name + "/settings_file", settings_file, "file_not_set");
+    node_handler.param<std::string>(node_name + "/traj_save_file", traj_save_file, "");
 
     if (voc_file == "file_not_set" || settings_file == "file_not_set")
     {
@@ -79,7 +80,16 @@ int main(int argc, char **argv)
 
     std::thread sync_thread(&ImageGrabber::SyncWithImu, &igb);
 
-    ros::spin();
+    while (ros::ok())
+    {
+        ros::spin();
+    }
+
+    // Save trajectory if requested
+    if (traj_save_file != "")
+    {
+        SLAM.SaveTrajectoryTUM(traj_save_file);
+    }
 
     // Stop all threads
     SLAM.Shutdown();
