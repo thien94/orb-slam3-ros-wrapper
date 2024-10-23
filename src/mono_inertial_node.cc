@@ -21,17 +21,21 @@ public:
 class ImageGrabber
 {
 public:
-    ImageGrabber(ORB_SLAM3::System* pSLAM, ImuGrabber *pImuGb): mpSLAM(pSLAM), mpImuGb(pImuGb){}
+    ImageGrabber(ORB_SLAM3::System* pSLAM, ImuGrabber *pImuGb, const std::string& traj_save_file_): mpSLAM(pSLAM), mpImuGb(pImuGb), traj_save_file(traj_save_file_){}
+
 
     void GrabImage(const sensor_msgs::ImageConstPtr& msg);
     cv::Mat GetImage(const sensor_msgs::ImageConstPtr &img_msg);
     void SyncWithImu();
+
+    void TrajSaveCallback(const ros::TimerEvent &e);
 
     queue<sensor_msgs::ImageConstPtr> img0Buf;
     std::mutex mBufMutex;
    
     ORB_SLAM3::System* mpSLAM;
     ImuGrabber *mpImuGb;
+    const std::string traj_save_file;
 };
 
 
@@ -71,13 +75,15 @@ int main(int argc, char **argv)
     ORB_SLAM3::System SLAM(voc_file, settings_file, sensor_type, enable_pangolin);
 
     ImuGrabber imugb;
-    ImageGrabber igb(&SLAM, &imugb);
+    ImageGrabber igb(&SLAM, &imugb, traj_save_file);
 
     ros::Subscriber sub_imu = node_handler.subscribe("/imu", 1000, &ImuGrabber::GrabImu, &imugb); 
     ros::Subscriber sub_img0 = node_handler.subscribe("/camera/image_raw", 100, &ImageGrabber::GrabImage, &igb);
 
     setup_ros_publishers(node_handler, image_transport);
-
+    
+    // Timer callback to save trajectory every few seconds
+    ros::Timer timer = node_handler.createTimer(ros::Duration(5.0), &ImageGrabber::TrajSaveCallback, &igb);
     std::thread sync_thread(&ImageGrabber::SyncWithImu, &igb);
 
     while (ros::ok())
@@ -96,6 +102,17 @@ int main(int argc, char **argv)
     ros::shutdown();
 
     return 0;
+}
+
+void ImageGrabber::TrajSaveCallback(const ros::TimerEvent &e)
+{
+    if (traj_save_file == "")
+    {
+        return;
+    }
+
+    ROS_DEBUG("Attempting to save current traj to file...");
+    mpSLAM->SaveTrajectoryTUM(traj_save_file);
 }
 
 void ImageGrabber::GrabImage(const sensor_msgs::ImageConstPtr &img_msg)
