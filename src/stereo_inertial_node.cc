@@ -95,7 +95,7 @@ int main(int argc, char **argv)
     // Save trajectory if requested
     if (traj_save_file != "")
     {
-        SLAM.SaveTrajectoryTUM(traj_save_file);
+        SLAM.SaveKeyFrameTrajectoryTUM(traj_save_file);
     }
 
     // Stop all threads
@@ -113,7 +113,7 @@ void ImageGrabber::TrajSaveCallback(const ros::TimerEvent &e)
     }
 
     ROS_DEBUG("Attempting to save current traj to file...");
-    mpSLAM->SaveTrajectoryTUM(traj_save_file);
+    mpSLAM->SaveKeyFrameTrajectoryTUM(traj_save_file);
 }
 
 void ImageGrabber::GrabImageLeft(const sensor_msgs::ImageConstPtr &img_msg)
