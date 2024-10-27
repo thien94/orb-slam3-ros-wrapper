@@ -1,5 +1,5 @@
 /**
-* 
+*
 * Adapted from ORB-SLAM3: Examples/ROS/src/ros_stereo_inertial.cc
 *
 */
@@ -7,6 +7,10 @@
 #include "common.h"
 
 using namespace std;
+
+// Lazy globals
+std::vector<double> vTimesKeyframes;
+std::vector<int> vMemUsageKeyframes;
 
 class ImuGrabber
 {
@@ -28,7 +32,7 @@ public:
     void GrabImageRight(const sensor_msgs::ImageConstPtr& msg);
     cv::Mat GetImage(const sensor_msgs::ImageConstPtr &img_msg);
     void SyncWithImu();
-    
+
     void TrajSaveCallback(const ros::TimerEvent &e);
 
     queue<sensor_msgs::ImageConstPtr> imgLeftBuf, imgRightBuf;
@@ -58,7 +62,7 @@ int main(int argc, char **argv)
 
     if (voc_file == "file_not_set" || settings_file == "file_not_set")
     {
-        ROS_ERROR("Please provide voc_file and settings_file in the launch file");       
+        ROS_ERROR("Please provide voc_file and settings_file in the launch file");
         ros::shutdown();
         return 1;
     }
@@ -76,12 +80,12 @@ int main(int argc, char **argv)
     ImageGrabber igb(&SLAM, &imugb, traj_save_file);
 
     // Maximum delay, 5 seconds * 200Hz = 1000 samples
-    ros::Subscriber sub_imu = node_handler.subscribe("/imu", 1000, &ImuGrabber::GrabImu, &imugb); 
+    ros::Subscriber sub_imu = node_handler.subscribe("/imu", 1000, &ImuGrabber::GrabImu, &imugb);
     ros::Subscriber sub_img_left = node_handler.subscribe("/camera/left/image_raw", 100, &ImageGrabber::GrabImageLeft, &igb);
     ros::Subscriber sub_img_right = node_handler.subscribe("/camera/right/image_raw", 100, &ImageGrabber::GrabImageRight, &igb);
 
     setup_ros_publishers(node_handler, image_transport);
-    
+
     // Timer callback to save trajectory every few seconds
     ros::Timer timer = node_handler.createTimer(ros::Duration(5.0), &ImageGrabber::TrajSaveCallback, &igb);
 
@@ -97,6 +101,10 @@ int main(int argc, char **argv)
     {
         SLAM.SaveKeyFrameTrajectoryTUM(traj_save_file);
     }
+
+    // Save usage vectors
+    memUsage::dumpVectorToFile(vTimesKeyframes, "KeyframeTrackTiming.txt");
+    memUsage::dumpVectorToFile(vMemUsageKeyframes, "KeyframeMemUsageKB.txt");
 
     // Stop all threads
     SLAM.Shutdown();
@@ -146,7 +154,7 @@ cv::Mat ImageGrabber::GetImage(const sensor_msgs::ImageConstPtr &img_msg)
     {
         ROS_ERROR("cv_bridge exception: %s", e.what());
     }
-    
+
     if(cv_ptr->image.type()==0)
     {
         return cv_ptr->image.clone();
@@ -218,22 +226,33 @@ void ImageGrabber::SyncWithImu()
                     cv::Point3f acc(mpImuGb->imuBuf.front()->linear_acceleration.x, mpImuGb->imuBuf.front()->linear_acceleration.y, mpImuGb->imuBuf.front()->linear_acceleration.z);
 
                     cv::Point3f gyr(mpImuGb->imuBuf.front()->angular_velocity.x, mpImuGb->imuBuf.front()->angular_velocity.y, mpImuGb->imuBuf.front()->angular_velocity.z);
-                    
+
                     vImuMeas.push_back(ORB_SLAM3::IMU::Point(acc,gyr,t));
 
                     mpImuGb->imuBuf.pop();
                 }
             }
             mpImuGb->mBufMutex.unlock();
-            
+
             // ORB-SLAM3 runs in TrackStereo()
+            const std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
             Sophus::SE3f Tcw = mpSLAM->TrackStereo(imLeft,imRight,tImLeft,vImuMeas);
+            const std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
+            const double ttrack = std::chrono::duration_cast<std::chrono::duration<double>>(t2 - t1).count();
+
+            // Measure time and memory usage
+            if (mpSLAM->isKeyFrame())
+            {
+                vTimesKeyframes.push_back(ttrack);
+                vMemUsageKeyframes.push_back(memUsage::getMemUsageKB());
+            }
+
             Sophus::SE3f Twc = Tcw.inverse();
-            
+
             publish_ros_camera_pose(Twc, msg_time);
             publish_ros_tf_transform(Twc, world_frame_id, cam_frame_id, msg_time);
             publish_ros_tracked_mappoints(mpSLAM->GetTrackedMapPoints(), msg_time);
-            
+
             std::chrono::milliseconds tSleep(1);
             std::this_thread::sleep_for(tSleep);
         }
@@ -245,6 +264,6 @@ void ImuGrabber::GrabImu(const sensor_msgs::ImuConstPtr &imu_msg)
     mBufMutex.lock();
     imuBuf.push(imu_msg);
     mBufMutex.unlock();
-    
+
     return;
 }
