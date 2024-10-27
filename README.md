@@ -1,5 +1,7 @@
 # ROS wrapper for ORB-SLAM3
 
+> **NOTE:** The example here uses a [fork of ORB-SLAM3](https://github.com/tianyilim/ORB_SLAM3) which contains some utilities for measuring memory usage of the Linux process for benchmarking purposes.
+
 A ROS wrapper for [ORB-SLAM3](https://github.com/UZ-SLAMLab/ORB_SLAM3). The main idea is to use the ORB-SLAM3 as a standalone library and interface with it instead of putting everything together. For that, you can check out [this package](https://github.com/thien94/orb_slam_3_ros).
 
 Tested with ORB-SLAM3 V1.0, primarily on Ubuntu 20.04.
