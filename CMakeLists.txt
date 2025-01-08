@@ -3,7 +3,7 @@ project(orb_slam3_ros_wrapper)
 
 # Change this to your installation of ORB-SLAM3. Default is ~/
 set(ORB_SLAM3_DIR
-   $ENV{HOME}/Packages/ORB_SLAM3
+   /ORB_SLAM3
 )
 
 set(CMAKE_BUILD_TYPE "Release")
