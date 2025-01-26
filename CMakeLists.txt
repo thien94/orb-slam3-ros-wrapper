@@ -75,6 +75,15 @@ target_link_libraries(${PROJECT_NAME}_stereo
    ${LIBS}
 )
 
+# stereo node (replay)
+add_executable (${PROJECT_NAME}_stereo_replay
+   src/replay_stereo_node.cc
+   src/common.cc
+)
+target_link_libraries(${PROJECT_NAME}_stereo_replay
+   ${LIBS}
+)
+
 
 # mono-inertial node
 add_executable (${PROJECT_NAME}_mono_inertial
