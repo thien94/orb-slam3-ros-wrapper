@@ -13,6 +13,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g")
 find_package (catkin REQUIRED COMPONENTS
    roscpp
    rospy
+   rosbag
    std_msgs
    cv_bridge
    image_transport
