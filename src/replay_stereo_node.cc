@@ -13,6 +13,8 @@ Adapted from ORB-SLAM3: Examples/ROS/src/ros_stereo.cc
 
 using namespace std;
 
+const string MEM_USAGE_DUMP = "/user/orbslam3_mem_usage.txt";
+
 class ImageGrabber {
    public:
     ImageGrabber(ORB_SLAM3::System* pSLAM) : mpSLAM(pSLAM) {}
@@ -151,6 +153,11 @@ int main(int argc, char** argv)
     ORB_SLAM3::System SLAM(voc_file, settings_file, sensor_type, enable_pangolin);
     ImageGrabber igb(&SLAM);
 
+    // Start logging memory usage
+    std::ofstream mem_usage_file(MEM_USAGE_DUMP, std::ios::out);
+    mem_usage_file << "# Sim Time Elapsed(s), Real Time Elapsed(s), Mem Usage (KB)" << std::endl;
+    mem_usage_file.close();
+
     ROS_INFO("Opening rosbag: %s", rosbag_path.c_str());
     // Open rosbag
     rosbag::Bag bag;
@@ -173,13 +180,40 @@ int main(int argc, char** argv)
     const float bag_end_time = view.getEndTime().toSec();
     const float bag_duration = bag_end_time - bag_start_time;
 
+    const auto time_start_real = std::chrono::high_resolution_clock::now();
+    auto last_print_time = std::chrono::high_resolution_clock::now();
+
     for (rosbag::MessageInstance const m : view) {
         if (!ros::ok()) {
             break;
         }
 
         const float curr_msg_time = m.getTime().toSec();
-        ROS_INFO_THROTTLE(1, "Time: %0.3f / %0.3fs", curr_msg_time - bag_start_time, bag_duration);
+
+        auto time_since_last_print =
+            std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::high_resolution_clock::now() - last_print_time)
+                .count();
+        auto time_since_start = std::chrono::duration_cast<std::chrono::milliseconds>(
+                                    std::chrono::high_resolution_clock::now() - time_start_real)
+                                    .count();
+        if (time_since_last_print > 1000) {
+            ROS_INFO("Time: %0.3f / %0.3fs", curr_msg_time - bag_start_time, bag_duration);
+            last_print_time = std::chrono::high_resolution_clock::now();
+
+            const int mem_usage_kb = memUsage::getMemUsageKB();
+            mem_usage_file.open(MEM_USAGE_DUMP, std::ios::app);
+            mem_usage_file << (curr_msg_time - bag_start_time) << ", " << time_since_start / 1000.0
+                           << ", " << mem_usage_kb << std::endl;
+            mem_usage_file.close();
+
+            // TODO update
+            // 80GB for here
+            if (mem_usage_kb > 80'000'000) {
+                ROS_ERROR("High memory usage, exiting!: %d KB", mem_usage_kb);
+                break;
+            }
+        }
 
         if (m.getTopic() == std::string(left_cam_topic)) {
             sensor_msgs::ImageConstPtr img_msg = m.instantiate<sensor_msgs::Image>();
@@ -194,6 +228,7 @@ int main(int argc, char** argv)
             continue;
         }
     }
+    bag.close();
 
     auto time_end = std::chrono::high_resolution_clock::now();
     auto duration_ms =
@@ -205,8 +240,6 @@ int main(int argc, char** argv)
         time_file << duration_ms << std::endl;
         time_file.close();
     }
-
-    bag.close();
 
     // Save trajectory if requested
     if (traj_save_file != "") {
