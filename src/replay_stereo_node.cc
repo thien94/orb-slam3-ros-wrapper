@@ -169,11 +169,17 @@ int main(int argc, char** argv)
 
     // Check if we are faster than just rosbag play :)
     auto time_start = std::chrono::high_resolution_clock::now();
+    const float bag_start_time = view.getBeginTime().toSec();
+    const float bag_end_time = view.getEndTime().toSec();
+    const float bag_duration = bag_end_time - bag_start_time;
 
     for (rosbag::MessageInstance const m : view) {
         if (!ros::ok()) {
             break;
         }
+
+        const float curr_msg_time = m.getTime().toSec();
+        ROS_INFO_THROTTLE(1, "Time: %0.3f / %0.3fs", curr_msg_time - bag_start_time, bag_duration);
 
         if (m.getTopic() == std::string(left_cam_topic)) {
             sensor_msgs::ImageConstPtr img_msg = m.instantiate<sensor_msgs::Image>();
