@@ -32,17 +32,17 @@ class ImageGrabber {
 void ImageGrabber::GrabLeft(const sensor_msgs::ImageConstPtr& msgLeft)
 {
     left_image = msgLeft;
-    if (right_image) {
-        const auto time_diff_s =
-            abs(right_image->header.stamp.toSec() - left_image->header.stamp.toSec());
-        if (time_diff_s > 0.01) {
-            ROS_INFO("Time diff %0.3f s, skipping", time_diff_s);
-            return;
-        }
-
-        GrabStereo(left_image, right_image);
+    if (!right_image) {
+        return;
+    }
+    const auto time_diff_s =
+        abs(right_image->header.stamp.toSec() - left_image->header.stamp.toSec());
+    if (time_diff_s > 0.01) {
+        ROS_INFO("Time diff %0.3f s, skipping", time_diff_s);
+        return;
     }
 
+    GrabStereo(left_image, right_image);
     left_image = nullptr;
     right_image = nullptr;
 }
@@ -50,17 +50,17 @@ void ImageGrabber::GrabLeft(const sensor_msgs::ImageConstPtr& msgLeft)
 void ImageGrabber::GrabRight(const sensor_msgs::ImageConstPtr& msgRight)
 {
     right_image = msgRight;
-    if (left_image) {
-        const auto time_diff_s =
-            abs(right_image->header.stamp.toSec() - left_image->header.stamp.toSec());
-        if (time_diff_s > 0.01) {
-            ROS_INFO("Time diff %0.3f s, skipping", time_diff_s);
-            return;
-        }
-
-        GrabStereo(left_image, right_image);
+    if (!left_image) {
+        return;
+    }
+    const auto time_diff_s =
+        abs(right_image->header.stamp.toSec() - left_image->header.stamp.toSec());
+    if (time_diff_s > 0.01) {
+        ROS_INFO("Time diff %0.3f s, skipping", time_diff_s);
+        return;
     }
 
+    GrabStereo(left_image, right_image);
     left_image = nullptr;
     right_image = nullptr;
 }
@@ -90,13 +90,11 @@ void ImageGrabber::GrabStereo(const sensor_msgs::ImageConstPtr& msgLeft,
     // Main algorithm runs here
     Sophus::SE3f Tcc0 = mpSLAM->TrackStereo(cv_ptrLeft->image, cv_ptrRight->image,
                                             cv_ptrLeft->header.stamp.toSec());
-    Sophus::SE3f Twc = (Tcc0 * Tc0w).inverse();
-
-    ros::Time msg_time = cv_ptrLeft->header.stamp;
-
-    publish_ros_camera_pose(Twc, msg_time);
-    publish_ros_tf_transform(Twc, world_frame_id, cam_frame_id, msg_time);
-    publish_ros_tracked_mappoints(mpSLAM->GetTrackedMapPoints(), msg_time);
+    // Sophus::SE3f Twc = (Tcc0 * Tc0w).inverse();
+    // ros::Time msg_time = cv_ptrLeft->header.stamp;
+    // publish_ros_camera_pose(Twc, msg_time);
+    // publish_ros_tf_transform(Twc, world_frame_id, cam_frame_id, msg_time);
+    // publish_ros_tracked_mappoints(mpSLAM->GetTrackedMapPoints(), msg_time);
 }
 
 int main(int argc, char** argv)
@@ -107,11 +105,12 @@ int main(int argc, char** argv)
     ros::console::set_logger_level(ROSCONSOLE_DEFAULT_NAME, ros::console::levels::Info);
 
     // Read params from roslaunch
-    std::string voc_file, settings_file, traj_save_file, rosbag_path;
+    std::string voc_file, settings_file, traj_save_file, time_save_file, rosbag_path;
     std::string left_cam_topic, right_cam_topic;
     node_handler.param<std::string>(node_name + "/voc_file", voc_file, "file_not_set");
     node_handler.param<std::string>(node_name + "/settings_file", settings_file, "file_not_set");
     node_handler.param<std::string>(node_name + "/traj_save_file", traj_save_file, "");
+    node_handler.param<std::string>(node_name + "/time_save_file", time_save_file, "");
     node_handler.param<std::string>(node_name + "/rosbag_path", rosbag_path, "");
     node_handler.param<std::string>(node_name + "/left_cam_topic", left_cam_topic, "");
     node_handler.param<std::string>(node_name + "/right_cam_topic", right_cam_topic, "");
@@ -172,7 +171,6 @@ int main(int argc, char** argv)
     auto time_start = std::chrono::high_resolution_clock::now();
 
     for (rosbag::MessageInstance const m : view) {
-        // ROS_DEBUG("Read topic [%s]", m.getTopic().c_str());
         if (!ros::ok()) {
             break;
         }
@@ -194,8 +192,13 @@ int main(int argc, char** argv)
     auto time_end = std::chrono::high_resolution_clock::now();
     auto duration_ms =
         std::chrono::duration_cast<std::chrono::milliseconds>(time_end - time_start).count();
-    ROS_WARN("Loop duration: %0.2fd ms | Effective freq: %0.2f Hz", duration_ms,
-             1000.0 / duration_ms);
+    ROS_WARN("Loop duration: %ld ms | Effective freq: %0.2f Hz", duration_ms, 1000.0 / duration_ms);
+    if (time_save_file != "") {
+        ROS_INFO("Saving loop duration to %s", time_save_file.c_str());
+        std::ofstream time_file(time_save_file);
+        time_file << duration_ms << std::endl;
+        time_file.close();
+    }
 
     bag.close();
 
