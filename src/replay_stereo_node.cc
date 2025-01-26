@@ -101,18 +101,6 @@ void ImageGrabber::GrabStereo(const sensor_msgs::ImageConstPtr& msgLeft,
 
 int main(int argc, char** argv)
 {
-    if (argc < 2) {
-        ROS_ERROR(
-            "Usage: rosrun orbslam_ros_wrapper orb_slam3_ros_wrapper_stereo_replay "
-            "[rosbag_path]\n");
-
-        for (int i = 0; i < argc; i++) {
-            ROS_ERROR("argv[%d]: %s\n", i, argv[i]);
-        }
-
-        return 1;
-    }
-
     ros::init(argc, argv, "orbslam3_ros_wrapper_stereo_replay");
     ros::NodeHandle node_handler;
     std::string node_name = ros::this_node::getName();
