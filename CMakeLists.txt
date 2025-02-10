@@ -3,7 +3,7 @@ project(orb_slam3_ros_wrapper)
 
 # Change this to your installation of ORB-SLAM3. Default is ~/
 set(ORB_SLAM3_DIR
-   $ENV{HOME}/Packages/ORB_SLAM3
+   /ORB_SLAM3
 )
 
 set(CMAKE_BUILD_TYPE "Release")
@@ -13,6 +13,7 @@ set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -g")
 find_package (catkin REQUIRED COMPONENTS
    roscpp
    rospy
+   rosbag
    std_msgs
    cv_bridge
    image_transport
@@ -72,6 +73,15 @@ add_executable (${PROJECT_NAME}_stereo
    src/common.cc
 )
 target_link_libraries(${PROJECT_NAME}_stereo
+   ${LIBS}
+)
+
+# stereo node (replay)
+add_executable (${PROJECT_NAME}_stereo_replay
+   src/replay_stereo_node.cc
+   src/common.cc
+)
+target_link_libraries(${PROJECT_NAME}_stereo_replay
    ${LIBS}
 )
 

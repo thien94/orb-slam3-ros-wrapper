@@ -28,6 +28,7 @@
 // ORB-SLAM3-specific libraries. Directory is defined in CMakeLists.txt: ${ORB_SLAM3_DIR}
 #include "include/System.h"
 #include "include/ImuTypes.h"
+#include "include/memUsage.h"
 
 extern ORB_SLAM3::System::eSensor sensor_type;
 extern std::string world_frame_id, cam_frame_id, imu_frame_id;
